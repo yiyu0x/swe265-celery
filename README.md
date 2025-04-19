@@ -1,4 +1,4 @@
-# Celery Demo with Docker
+# Celery Demo 
 
 This repository demonstrates a Celery setup with Docker, including RabbitMQ as message broker, Prometheus for monitoring, and a custom Celery exporter.
 
