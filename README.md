@@ -38,6 +38,7 @@ docker exec -it celery_worker python -m celery -A tasks inspect stats
 ## Access Points
 
 - RabbitMQ Management: http://localhost:15672 (user/pass)
+- Prometheus: http://localhost:9090
 - Metrics Endpoint: http://localhost:8888/metrics
 
 ## Key Metrics
