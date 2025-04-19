@@ -1,0 +1,71 @@
+services:
+  # ────────────────────────── RabbitMQ ────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: user
+      RABBITMQ_DEFAULT_PASS: pass
+      RABBITMQ_PLUGINS: "rabbitmq_prometheus rabbitmq_management"
+    ports:
+      - "5672:5672"          # broker
+      - "15672:15672"        # RabbitMQ Web UI → http://localhost:15672
+      - "15692:15692"        # RabbitMQ Prometheus metrics
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ────────────────────────── Celery Worker ────────────────────────
+  worker:
+    image: python:3.12-slim
+    container_name: celery_worker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./:/app              # Map tasks.py into container
+    environment:
+      CELERY_BROKER_URL: amqp://user:pass@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: rpc://
+    command: >
+      sh -c "pip install --no-cache-dir celery==5.5.1 prometheus-client &&
+             python -m celery -A tasks worker --loglevel=info --events"
+
+  # ────────────────────────── Celery Exporter ────────────────────────
+  celery-exporter:
+    image: python:3.12-slim
+    container_name: celery_exporter
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: >
+      sh -c "pip install --no-cache-dir celery==5.5.1 prometheus-client kombu &&
+             python celery_exporter.py"
+    ports:
+      - "8888:8888"  # For Prometheus metrics collection
+
+  # ────────────────────────── Prometheus ────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+
+
